@@ -1,25 +1,60 @@
 ---
-title: "Reproducible Research: Peer Assessment 1"
-output: 
-  html_document:
-    keep_md: true
+title: "RR-PA1"
+author: "Mike Danielson"
+date: "September 19, 2015"
+output: html_document
 ---
-
-
-## Loading and preprocessing the data
-
-
-
-## What is mean total number of steps taken per day?
-
-
-
-## What is the average daily activity pattern?
-
-
-
-## Imputing missing values
-
-
-
-## Are there differences in activity patterns between weekdays and weekends?
+Step-1: set-up environment, download & unzip file, import as data frame
+```{r}
+library(plyr)
+library(lattice)
+setInternet2(TRUE)
+download.file(url = "https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip",destfile = "temp")
+unzip("temp","activity.csv")
+data <- read.csv("activity.csv")
+```
+Step-2: process data for further use
+```{r}
+hour <- trunc(data$interval/100)
+data$datetime <- paste(data$date,":",hour,":",data$interval - 100*hour,sep="")
+data$datetime <- strptime(data$datetime,"%Y-%m-%d:%H:%M")
+```
+Step-3: calc mean, median, and produce histogram
+```{r}
+avedata <- na.omit(aggregate(data$steps, by =list(as.Date(data$datetime)),FUN = mean,na.action=na.omit))
+avedata <- rename(avedata,c("Group.1"="date","x"="steps"))
+format(avedata,digits=4)
+hist(avedata$steps,main ="Histogram of Steps/Day",xlab="Steps",ylab="Frequency")
+paste("mean of steps per day =",format(mean(avedata$steps),digits=6))
+paste("median of steps per day =",format(median(avedata$steps),digits=6))
+```
+Step-4: Create time series plot of average number of steps taken, averaged across all days.
+Determine interval with maximum activity.
+```{r}
+avedata <- na.omit(data)
+avedata <- aggregate(avedata$steps, by =list(avedata$interval),FUN = mean)
+avedata <- rename(avedata,c("Group.1"="interval","x"="steps"))
+plot(x = avedata$interval,y = avedata$steps,type="l",main ="Average Steps Taken",xlab="5-minute Interval",ylab="Steps")
+paste("Maximum activity occurs during interval",data$interval[which.max(avedata$steps)])
+```
+Step-5: Calc number of NAs. Strategy for filling NAs and fill NAs in new dataset. I replaced the NAs with the mean of all
+intervals for all days. Compare to original dataset.Determine interval with maximum activity.
+```{r}
+paste("total number of missing data values =",sum(is.na(data$steps)))
+newdata <- data
+newdata[is.na(newdata)] <- mean(newdata$steps,na.rm=TRUE)
+avenewdata <- na.omit(aggregate(newdata$steps, by =list(as.Date(newdata$datetime)),FUN = mean,na.action=na.omit))
+avenewdata <- rename(avenewdata,c("Group.1"="date","x"="steps"))
+format(avenewdata,digits=4)
+hist(avenewdata$steps,main ="Histogram of Steps/Day",xlab="Steps",ylab="Frequency")
+paste("mean of steps per day =",format(mean(avenewdata$steps),digits=6))
+paste("median of steps per day =",format(median(avenewdata$steps),digits=6))
+```
+Step-6: Create new factor variable for weekdays/weekends. Make a panel plot of weekend/weekday 5-minute data.
+```{r}
+newdata$weekend <- weekdays(newdata$datetime)=="Saturday" | weekdays(newdata$datetime)=="Sunday"
+newdata$weekend <- factor(newdata$weekend, labels = c("weekday","weekend"))
+avedata <- aggregate(newdata$steps, by =list(newdata$interval,newdata$weekend),FUN = mean)
+avedata <- rename(avedata,c("Group.1"="interval","Group.2"="weekend","x"="steps"))
+xyplot(avedata$steps~avedata$interval|avedata$weekend,type='l',layout=(c(1,2)),xlab="Interval",ylab="Number of steps")
+```
